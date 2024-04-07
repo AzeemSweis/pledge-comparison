@@ -6,14 +6,46 @@ import io
 app = Flask(__name__)
 CORS(app)
 
+import csv
+import io
+
 def read_csv(file_obj):
-    # Convert file storage to StringIO for csv reader compatibility if not already a StringIO
     if not isinstance(file_obj, io.StringIO):
         file_obj = io.StringIO(file_obj.read().decode('utf-8'))
+    
     reader = csv.reader(file_obj)
-    # Skip the header if present
-    next(reader, None)
-    return {rows[0]: float(rows[1]) for rows in reader if len(rows) >= 2 and rows[1].replace('.', '', 1).isdigit()}
+    
+    # Skip the first 5 rows of irrelevant data
+    for _ in range(5):
+        next(reader, None)
+    
+    # Read the headers from row 6
+    headers = next(reader, None)
+    if headers is None:
+        return {}
+    
+    # Identify the columns for names and amounts
+    try:
+        name_col_index = headers.index('Name')
+        amount_col_index = headers.index('Amount')
+    except ValueError:
+        return {}  # Proper headers not found
+
+    # Read and process the relevant data rows
+    data = {}
+    for row in reader:
+        # Assuming that the final 4 rows are irrelevant
+        if len(row) > max(name_col_index, amount_col_index):
+            try:
+                name = row[name_col_index].strip()
+                amount = float(row[amount_col_index])
+                data[name] = amount
+            except ValueError:
+                continue  # Skip rows where conversion to float fails or irrelevant rows
+
+    return data
+
+
 
 def process_files(previous_month_file, current_month_file):
     previous_month = read_csv(previous_month_file)
